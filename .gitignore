@@ -1,0 +1,27 @@
+1. Virtual Environment
+
+venv/
+env/
+.env
+
+2. Data
+
+data/
+*.csv
+*.xlsx
+
+3. Python Cache & Build artifacts
+
+pycache/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+4. OS System Files
+
+.DS_Store
+Thumbs.db
+
+5. IDE Settings (Optional but recommended)
+
+.vscode/
