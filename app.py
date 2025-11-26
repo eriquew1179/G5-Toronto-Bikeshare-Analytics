@@ -4,11 +4,13 @@ from src.loader import DataLoader
 from src.prediction import predict_hourly_demand # <--- US-13/14 Import
 import os
 import datetime
+from PIL import Image
 
 # --- Configuration ---
 st.set_page_config(
     page_title="Toronto Bike Share Analytics (Aug 2024)",
-    layout="wide"
+    layout="wide",
+    page_icon="🚲"
 )
 
 # --- 1. Load Data ---
@@ -26,9 +28,22 @@ except FileNotFoundError:
     st.stop()
 
 # --- 2. Sidebar Filters (US-12) ---
+
+# --- LOGO SECTION (New) ---
+# We place this at the very top of the sidebar
+logo_path = os.path.join("assets", "logo.jpg") # Changed to 'assets' folder and 'jpg' extension
+
+if os.path.exists(logo_path):
+    # Display logo in sidebar with some padding
+    st.sidebar.image(logo_path, use_container_width=True)
+else:
+    # Fallback if logo is missing
+    st.sidebar.write("🚲 **Group 5 Analytics**")
+
+st.sidebar.markdown("---") # Divider after logo
 st.sidebar.header("Filters")
 
-# Calculate the min/max dates dynamically from your dataset
+# Calculate the min/max dates dynamically
 if not df.empty and 'Start Time' in df.columns:
     min_date = df['Start Time'].min().date()
     max_date = df['Start Time'].max().date()
@@ -42,25 +57,28 @@ st.sidebar.info(f"📅 **Data Available:**\n{min_date} to {max_date}")
 start_date = st.sidebar.date_input("Start Date", min_date, min_value=min_date, max_value=max_date)
 end_date = st.sidebar.date_input("End Date", max_date, min_value=min_date, max_value=max_date)
 
-# Time Filters (New)
+# Time Filters
 st.sidebar.markdown("---")
 st.sidebar.write("🕒 **Time Filter**")
 start_time = st.sidebar.time_input("Start Time", datetime.time(0, 0)) # Default to midnight
 end_time = st.sidebar.time_input("End Time", datetime.time(23, 59))   # Default to end of day
 
 # Combine Date and Time into Timestamps
-# We combine the selected date with the selected time to create a full datetime object
 start_datetime = pd.to_datetime(f"{start_date} {start_time}")
 end_datetime = pd.to_datetime(f"{end_date} {end_time}")
 
-# --- Filter Logic (Updated for Time) ---
-# Now we filter using the full datetime objects (start_datetime and end_datetime)
-# We compare directly against the 'Start Time' column which is already datetime
+# --- Filter Logic ---
 mask = (df['Start Time'] >= start_datetime) & (df['Start Time'] <= end_datetime)
 filtered_df = df.loc[mask]
 
 # --- 3. Main Dashboard Area ---
+
+# Header with Logo and Title
 st.title("🚴 Toronto Bike Share: Daily Operations")
+st.subheader("Group 5 - Fall 2025 Agile Software Developmen")
+
+st.markdown("---") # Divider line
+st.markdown(f"**Analysis Period:** {start_datetime} to {end_datetime}")
 
 # Create Tabs for different views (US-14)
 tab1, tab2 = st.tabs(["📊 Historical Data", "🔮 Future Predictions"])
@@ -69,8 +87,7 @@ tab1, tab2 = st.tabs(["📊 Historical Data", "🔮 Future Predictions"])
 # TAB 1: Historical Data (Your Existing Work)
 # ==========================================
 with tab1:
-    st.markdown(f"**Analysis Period:** {start_datetime} to {end_datetime}")
-
+    
     # Key Metrics
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Trips", f"{len(filtered_df):,}")
