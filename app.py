@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from src.loader import DataLoader
+from src.prediction import predict_hourly_demand # <--- US-13/14 Import
 import os
 import datetime
 
@@ -60,17 +61,61 @@ filtered_df = df.loc[mask]
 
 # --- 3. Main Dashboard Area ---
 st.title("🚴 Toronto Bike Share: Daily Operations")
-st.markdown(f"**Analysis Period:** {start_datetime} to {end_datetime}")
 
-# Key Metrics
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Trips", f"{len(filtered_df):,}")
+# Create Tabs for different views (US-14)
+tab1, tab2 = st.tabs(["📊 Historical Data", "🔮 Future Predictions"])
 
-# Calculate duration in hours for the selected range
-time_diff = (end_datetime - start_datetime).total_seconds() / 3600 # Hours
-col2.metric("Avg Trips/Hour", f"{len(filtered_df) / max(1, time_diff):.1f}")
-col3.metric("Hours Selected", f"{time_diff:.1f} Hours")
+# ==========================================
+# TAB 1: Historical Data (Your Existing Work)
+# ==========================================
+with tab1:
+    st.markdown(f"**Analysis Period:** {start_datetime} to {end_datetime}")
 
-# Show raw data toggle
-if st.checkbox("Show Raw Data Sample"):
-    st.dataframe(filtered_df.head(50))
+    # Key Metrics
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Trips", f"{len(filtered_df):,}")
+
+    # Calculate duration in hours for the selected range
+    time_diff = (end_datetime - start_datetime).total_seconds() / 3600 # Hours
+    col2.metric("Avg Trips/Hour", f"{len(filtered_df) / max(1, time_diff):.1f}")
+    col3.metric("Hours Selected", f"{time_diff:.1f} Hours")
+
+    # Show raw data toggle
+    if st.checkbox("Show Raw Data Sample"):
+        st.dataframe(filtered_df.head(50))
+
+# ==========================================
+# TAB 2: Future Predictions (US-13 & US-14)
+# ==========================================
+with tab2:
+    st.header("🔮 Hourly Demand Forecast")
+    st.markdown("""
+    **Methodology:** This forecast calculates the average number of trips for each hour of the day (0-23) 
+    based on the **entire historical dataset** loaded (Aug 1 - Aug 8). It predicts the "Expected Demand" for a typical day.
+    """)
+    
+    # 1. Run Prediction Logic (US-13)
+    # We use the FULL 'df' here because we want the model to learn from ALL available days,
+    # not just the filtered range.
+    if not df.empty:
+        forecast_df = predict_hourly_demand(df)
+        
+        # 2. Visualization
+        st.subheader("Expected Trips per Hour (0-23)")
+        
+        # Set 'hour' as index so the line chart uses it as the X-axis
+        st.line_chart(forecast_df.set_index("hour")["predicted_demand"])
+        
+        # 3. Insight Metrics
+        # Find the hour with the maximum predicted demand
+        peak_row = forecast_df.loc[forecast_df['predicted_demand'].idxmax()]
+        
+        m1, m2 = st.columns(2)
+        m1.metric("Predicted Peak Hour", f"{int(peak_row['hour'])}:00")
+        m2.metric("Max Expected Trips", f"{peak_row['predicted_demand']:.1f}")
+        
+        # 4. Data Table
+        with st.expander("View Prediction Data Source"):
+            st.dataframe(forecast_df)
+    else:
+        st.warning("Not enough data to generate predictions.")
