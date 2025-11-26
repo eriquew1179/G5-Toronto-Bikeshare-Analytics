@@ -1,3 +1,31 @@
+import pytest
+def get_avg_duration(df):
+    """
+    US-02: Calculate average trip duration in minutes.
+    - Excludes outliers > 24 hours.
+    - Returns 0 for empty or invalid input.
+    """
+
+    if df is None or "trip_duration_seconds" not in df:
+        raise ValueError("df must contain 'trip_duration_seconds' column")
+
+    if df.empty:
+        return 0
+
+    # 24 hours in seconds
+    MAX_DURATION = 24 * 60 * 60  
+
+    # Filter outliers
+    valid = df[df["trip_duration_seconds"] <= MAX_DURATION]
+
+    if valid.empty:
+        return 0
+
+    avg_seconds = valid["trip_duration_seconds"].mean()
+
+    # convert to minutes
+    return avg_seconds / 60
+
 def get_total_trips(df):
     """
     US-01 Sprint 1:
