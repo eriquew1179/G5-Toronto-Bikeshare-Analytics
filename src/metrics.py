@@ -43,3 +43,16 @@ def get_bike_usage(df):
     (Implementation to be added in Green phase.)
     """
     raise NotImplementedError("stub for US-03 TDD")
+
+def get_user_type_breakdown(df):
+    """
+    US-04 Sprint 1:
+    Count trips by user_type ('Member' vs 'Casual').
+
+    Expected return (for Sprint 1):
+        {
+            "Member": <int>,
+            "Casual": <int>,
+        }
+    """
+    raise NotImplementedError("stub for US-04 TDD")
