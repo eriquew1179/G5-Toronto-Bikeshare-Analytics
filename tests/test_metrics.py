@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from src.metrics import get_total_trips, get_avg_duration, get_bike_usage
+from src.metrics import get_total_trips, get_avg_duration, get_bike_usage, get_user_type_breakdown
 
 
 def test_get_total_trips_returns_row_count():
@@ -75,3 +75,27 @@ def test_get_bike_usage_returns_empty_for_empty_df():
     assert list(result.columns) == ["bike_id", "total_duration_seconds"]
     assert result.empty
 
+def test_get_user_type_breakdown_counts_member_and_casual():
+    # 5 users: 3 Members, 2 Casual
+    df = pd.DataFrame({
+        "user_type": ["Member", "Casual", "Member", "Member", "Casual"]
+    })
+
+    result = get_user_type_breakdown(df)
+
+    # Expect counts for each type
+    assert result["Member"] == 3
+    assert result["Casual"] == 2
+    # Only these two keys in Sprint 1
+    assert set(result.keys()) == {"Member", "Casual"}
+
+
+def test_get_user_type_breakdown_returns_zero_counts_for_empty_df():
+    # No rows
+    df = pd.DataFrame(columns=["user_type"])
+
+    result = get_user_type_breakdown(df)
+
+    # Should gracefully return zeros
+    assert result["Member"] == 0
+    assert result["Casual"] == 0
