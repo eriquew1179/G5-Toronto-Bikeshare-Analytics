@@ -35,3 +35,11 @@ def get_total_trips(df):
         raise ValueError("df must not be None")
 
     return int(len(df))
+
+def get_bike_usage(df):
+    """
+    US-03 Sprint 1:
+    Group trips by bike_id and sum total duration per bike.
+    (Implementation to be added in Green phase.)
+    """
+    raise NotImplementedError("stub for US-03 TDD")
