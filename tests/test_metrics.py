@@ -1,7 +1,6 @@
 import pandas as pd
 import pytest
-from src.metrics import get_total_trips
-from src.metrics import get_total_trips, get_avg_duration
+from src.metrics import get_total_trips, get_avg_duration, get_bike_usage
 
 
 def test_get_total_trips_returns_row_count():
@@ -51,3 +50,28 @@ def test_get_avg_duration_excludes_outliers_over_24h():
 
     # Only 60 and 120 included → avg = 90 sec = 1.5 min
     assert result == pytest.approx(1.5)
+
+def test_get_bike_usage_sums_duration_per_bike():
+    # 3 trips: bike 1 has 60 + 120 = 180s, bike 2 has 30s
+    df = pd.DataFrame({
+        "bike_id": [1, 1, 2],
+        "trip_duration_seconds": [60, 120, 30],
+    })
+
+    result = get_bike_usage(df)
+
+    # Expect a DataFrame with one row per bike and total duration per bike
+    # Sorted descending by total duration for determinism
+    assert list(result["bike_id"]) == [1, 2]
+    assert list(result["total_duration_seconds"]) == [180, 30]
+
+
+def test_get_bike_usage_returns_empty_for_empty_df():
+    df = pd.DataFrame(columns=["bike_id", "trip_duration_seconds"])
+
+    result = get_bike_usage(df)
+
+    # Should return an empty DataFrame with the same expected columns
+    assert list(result.columns) == ["bike_id", "total_duration_seconds"]
+    assert result.empty
+
