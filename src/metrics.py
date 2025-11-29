@@ -1,13 +1,26 @@
 import pytest
 import pandas as pd
 
+import pandas as pd
+
+
+def get_total_trips(df):
+    """
+    US-01 Sprint 1:
+    Return total number of trips (row count).
+    """
+    if df is None:
+        raise ValueError("df must not be None")
+
+    return int(len(df))
+
+
 def get_avg_duration(df):
     """
     US-02: Calculate average trip duration in minutes.
     - Excludes outliers > 24 hours.
     - Returns 0 for empty or invalid input.
     """
-
     if df is None or "trip_duration_seconds" not in df:
         raise ValueError("df must contain 'trip_duration_seconds' column")
 
@@ -15,7 +28,7 @@ def get_avg_duration(df):
         return 0
 
     # 24 hours in seconds
-    MAX_DURATION = 24 * 60 * 60  
+    MAX_DURATION = 24 * 60 * 60
 
     # Filter outliers
     valid = df[df["trip_duration_seconds"] <= MAX_DURATION]
@@ -28,15 +41,6 @@ def get_avg_duration(df):
     # convert to minutes
     return avg_seconds / 60
 
-def get_total_trips(df):
-    """
-    US-01 Sprint 1:
-    Return total number of trips (row count).
-    """
-    if df is None:
-        raise ValueError("df must not be None")
-
-    return int(len(df))
 
 def get_bike_usage(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -56,7 +60,6 @@ def get_bike_usage(df: pd.DataFrame) -> pd.DataFrame:
         - Sum duration per bike.
         - Handle empty DataFrame gracefully.
     """
-
     if df is None:
         raise ValueError("df must not be None")
 
@@ -78,3 +81,17 @@ def get_bike_usage(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return grouped
+
+
+def get_user_type_breakdown(df):
+    """
+    US-04 Sprint 1:
+    Count trips by user_type ('Member' vs 'Casual').
+
+    Expected return (for Sprint 1):
+        {
+            "Member": <int>,
+            "Casual": <int>,
+        }
+    """
+    raise NotImplementedError("stub for US-04 TDD")
