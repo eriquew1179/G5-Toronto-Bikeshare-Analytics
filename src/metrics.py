@@ -47,12 +47,20 @@ def get_bike_usage(df):
 def get_user_type_breakdown(df):
     """
     US-04 Sprint 1:
-    Count trips by user_type ('Member' vs 'Casual').
-
-    Expected return (for Sprint 1):
-        {
-            "Member": <int>,
-            "Casual": <int>,
-        }
+    Return counts of Member vs Casual users.
     """
-    raise NotImplementedError("stub for US-04 TDD")
+
+    if df is None or "user_type" not in df:
+        raise ValueError("df must contain 'user_type' column")
+
+    if df.empty:
+        return {"Member": 0, "Casual": 0}
+
+    # Count occurrences
+    counts = df["user_type"].value_counts()
+
+    return {
+        "Member": int(counts.get("Member", 0)),
+        "Casual": int(counts.get("Casual", 0)),
+    }
+
