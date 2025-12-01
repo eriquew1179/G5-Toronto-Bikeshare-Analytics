@@ -1,11 +1,26 @@
 import pytest
+import pandas as pd
+
+import pandas as pd
+
+
+def get_total_trips(df):
+    """
+    US-01 Sprint 1:
+    Return total number of trips (row count).
+    """
+    if df is None:
+        raise ValueError("df must not be None")
+
+    return int(len(df))
+
+
 def get_avg_duration(df):
     """
     US-02: Calculate average trip duration in minutes.
     - Excludes outliers > 24 hours.
     - Returns 0 for empty or invalid input.
     """
-
     if df is None or "trip_duration_seconds" not in df:
         raise ValueError("df must contain 'trip_duration_seconds' column")
 
@@ -13,7 +28,7 @@ def get_avg_duration(df):
         return 0
 
     # 24 hours in seconds
-    MAX_DURATION = 24 * 60 * 60  
+    MAX_DURATION = 24 * 60 * 60
 
     # Filter outliers
     valid = df[df["trip_duration_seconds"] <= MAX_DURATION]
@@ -26,33 +41,65 @@ def get_avg_duration(df):
     # convert to minutes
     return avg_seconds / 60
 
-def get_total_trips(df):
+
+def get_bike_usage(df: pd.DataFrame) -> pd.DataFrame:
     """
-    US-01 Sprint 1:
-    Return total number of trips (row count).
+    US-03: Bike Usage
+
+    Group trips by bike_id and sum total trip_duration_seconds per bike.
+
+    Returns
+    -------
+    DataFrame
+        Columns:
+            - bike_id
+            - total_duration_seconds
+        One row per bike, sorted by total_duration_seconds (descending).
+
+    Sprint 1 scope:
+        - Sum duration per bike.
+        - Handle empty DataFrame gracefully.
     """
     if df is None:
         raise ValueError("df must not be None")
 
-    return int(len(df))
+    required_cols = {"bike_id", "trip_duration_seconds"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(f"df is missing required columns: {missing}")
 
-def get_bike_usage(df):
-    """
-    US-03 Sprint 1:
-    Group trips by bike_id and sum total duration per bike.
-    (Implementation to be added in Green phase.)
-    """
-    raise NotImplementedError("stub for US-03 TDD")
+    # If no rows, return an empty DataFrame with the expected columns
+    if df.empty:
+        return pd.DataFrame(columns=["bike_id", "total_duration_seconds"])
+
+    # Group by bike_id and sum duration
+    grouped = (
+        df.groupby("bike_id", as_index=False)["trip_duration_seconds"]
+        .sum()
+        .rename(columns={"trip_duration_seconds": "total_duration_seconds"})
+        .sort_values("total_duration_seconds", ascending=False)
+    )
+
+    return grouped
+
 
 def get_user_type_breakdown(df):
     """
     US-04 Sprint 1:
-    Count trips by user_type ('Member' vs 'Casual').
-
-    Expected return (for Sprint 1):
-        {
-            "Member": <int>,
-            "Casual": <int>,
-        }
+    Return counts of Member vs Casual users.
     """
-    raise NotImplementedError("stub for US-04 TDD")
+
+    if df is None or "user_type" not in df:
+        raise ValueError("df must contain 'user_type' column")
+
+    if df.empty:
+        return {"Member": 0, "Casual": 0}
+
+    # Count occurrences
+    counts = df["user_type"].value_counts()
+
+    return {
+        "Member": int(counts.get("Member", 0)),
+        "Casual": int(counts.get("Casual", 0)),
+    }
+
