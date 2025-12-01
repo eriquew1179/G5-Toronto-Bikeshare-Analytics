@@ -5,6 +5,7 @@ class DataLoader:
     """
     US-11: Data Loader
     Responsible for loading and cleaning the Toronto Bike Share dataset.
+    Refactored for Memory Optimization (Sprint 2).
     """
     def __init__(self, file_path: str):
         self.file_path = file_path
@@ -29,6 +30,9 @@ class DataLoader:
 
         # 4. Clean Data
         df = self.clean_data(df)
+        
+        # 5. Optimize Memory (Sprint 2 Refactor)
+        df = self._optimize_types(df)
         
         return df
 
@@ -81,4 +85,21 @@ class DataLoader:
         if existing_cols:
             df.dropna(subset=existing_cols, inplace=True)
 
+        return df
+    
+    def _optimize_types(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Sprint 2 Refactor: Converts low-cardinality string columns to categories.
+        This drastically reduces memory usage.
+        """
+        # List of columns that benefit from being categories (Repeated values)
+        # 'user_type' (Member/Casual)
+        # 'model' (ICONIC/EFIT)
+        # 'start_station_name' (Repeats often)
+        category_cols = ['user_type', 'model', 'start_station_name', 'end_station_name']
+        
+        for col in category_cols:
+            if col in df.columns:
+                df[col] = df[col].astype('category')
+                
         return df

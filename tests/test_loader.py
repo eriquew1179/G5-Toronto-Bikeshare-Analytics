@@ -4,11 +4,9 @@ import os
 from src.loader import DataLoader
 
 # --- Fixtures ---
-# This creates a tiny, temporary CSV file just for testing.
-
 @pytest.fixture
 def sample_csv(tmp_path):
-    # Create dummy data with some edge cases (like missing dates)
+    # Create dummy data using the ORIGINAL column names (mimicking the raw CSV)
     data = {
         "Trip Id": [101, 102, 103, 104],
         "Start Time": ["01/01/2018 00:00", "01/01/2018 00:15", "01/01/2018 00:30", None],
@@ -20,7 +18,7 @@ def sample_csv(tmp_path):
     }
     df = pd.DataFrame(data)
     
-    # Save to a temp file provided by pytest
+    # Save to a temp file
     file_path = tmp_path / "test_bikes.csv"
     df.to_csv(file_path, index=False)
     return str(file_path)
@@ -35,7 +33,9 @@ def test_load_data_successfully(sample_csv):
     assert isinstance(df, pd.DataFrame)
     # Should be 3 because the 4th row has None in 'Start Time' and should be dropped
     assert len(df) == 3  
-    assert "Trip Id" in df.columns
+    
+    # UPDATED ASSERTION: Check for the NEW standardized column name
+    assert "trip_id" in df.columns 
 
 def test_date_conversion(sample_csv):
     """Test AC 2: Converts date columns to datetime objects."""
