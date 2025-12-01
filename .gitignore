@@ -9,6 +9,7 @@ env/
 data/
 *.csv
 *.xlsx
+draft.py
 
 3. Python Cache & Build artifacts
 

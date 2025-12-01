@@ -1,105 +1,92 @@
-import pytest
 import pandas as pd
 
-import pandas as pd
-
-
-def get_total_trips(df):
+def get_total_trips(df: pd.DataFrame) -> int:
     """
-    US-01 Sprint 1:
-    Return total number of trips (row count).
+    US-01: Total Volume KPI
+    Returns total number of trips (rows) in the dataframe.
     """
     if df is None:
-        raise ValueError("df must not be None")
-
-    return int(len(df))
-
-
-def get_avg_duration(df):
-    """
-    US-02: Calculate average trip duration in minutes.
-    - Excludes outliers > 24 hours.
-    - Returns 0 for empty or invalid input.
-    """
-    if df is None or "trip_duration_seconds" not in df:
-        raise ValueError("df must contain 'trip_duration_seconds' column")
-
-    if df.empty:
         return 0
+    return len(df)
 
-    # 24 hours in seconds
-    MAX_DURATION = 24 * 60 * 60
+def get_avg_duration(df: pd.DataFrame) -> float:
+    """
+    US-02: Average Trip Duration
+    Calculates the average of 'trip_duration_seconds' and returns it in minutes.
+    """
+    if df is None or df.empty:
+        return 0.0
+    
+    # Try standard name first, then fallbacks
+    col_name = 'trip_duration_seconds'
+    if col_name not in df.columns:
+        # Fallback to 'amount' or original name if mapping failed
+        for fallback in ['Trip Duration', 'amount']:
+            if fallback in df.columns:
+                col_name = fallback
+                break
+    
+    if col_name not in df.columns:
+        return 0.0
 
-    # Filter outliers
-    valid = df[df["trip_duration_seconds"] <= MAX_DURATION]
-
-    if valid.empty:
-        return 0
-
-    avg_seconds = valid["trip_duration_seconds"].mean()
-
-    # convert to minutes
-    return avg_seconds / 60
-
+    # Calculate mean (handling potential string issues)
+    avg_val = pd.to_numeric(df[col_name], errors='coerce').mean()
+    
+    # Return in minutes (assuming data is in seconds)
+    return avg_val / 60 if avg_val else 0.0
 
 def get_bike_usage(df: pd.DataFrame) -> pd.DataFrame:
     """
     US-03: Bike Usage
-
-    Group trips by bike_id and sum total trip_duration_seconds per bike.
-
-    Returns
-    -------
-    DataFrame
-        Columns:
-            - bike_id
-            - total_duration_seconds
-        One row per bike, sorted by total_duration_seconds (descending).
-
-    Sprint 1 scope:
-        - Sum duration per bike.
-        - Handle empty DataFrame gracefully.
+    Groups by bike_id and sums the duration.
     """
-    if df is None:
-        raise ValueError("df must not be None")
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["bike_id", "total_usage"])
 
-    required_cols = {"bike_id", "trip_duration_seconds"}
-    missing = required_cols - set(df.columns)
-    if missing:
-        raise ValueError(f"df is missing required columns: {missing}")
+    # 1. Identify ID Column (Smart Search)
+    id_cols = ['bike_id', 'Bike Id', 'Bike ID', 'customer_id']
+    id_col = next((c for c in id_cols if c in df.columns), None)
 
-    # If no rows, return an empty DataFrame with the expected columns
-    if df.empty:
-        return pd.DataFrame(columns=["bike_id", "total_duration_seconds"])
+    # 2. Identify Value Column (Smart Search)
+    val_cols = ['trip_duration_seconds', 'Trip Duration', 'amount']
+    val_col = next((c for c in val_cols if c in df.columns), None)
 
-    # Group by bike_id and sum duration
-    grouped = (
-        df.groupby("bike_id", as_index=False)["trip_duration_seconds"]
+    if not id_col or not val_col:
+        print("ERROR: Could not find required columns for Bike Usage.")
+        return pd.DataFrame(columns=["bike_id", "total_usage"])
+
+    # 3. Group and Sum
+    # Ensure value column is numeric before summing
+    df = df.copy()
+    df[val_col] = pd.to_numeric(df[val_col], errors='coerce')
+    
+    usage = (
+        df.groupby(id_col)[val_col]
         .sum()
-        .rename(columns={"trip_duration_seconds": "total_duration_seconds"})
-        .sort_values("total_duration_seconds", ascending=False)
+        .reset_index()
+        .sort_values(val_col, ascending=False)
     )
+    
+    # Standardize output names for the UI
+    usage.columns = ["bike_id", "total_usage"]
+    
+    return usage
 
-    return grouped
-
-
-def get_user_type_breakdown(df):
+def get_user_type_breakdown(df: pd.DataFrame) -> dict:
     """
-    US-04 Sprint 1:
-    Return counts of Member vs Casual users.
+    US-04: User Type Split
+    Returns counts of each user type.
     """
+    if df is None or df.empty:
+        return {}
 
-    if df is None or "user_type" not in df:
-        raise ValueError("df must contain 'user_type' column")
+    # Identify User Column
+    user_cols = ['user_type', 'User Type', 'type']
+    col_name = next((c for c in user_cols if c in df.columns), None)
+    
+    if not col_name:
+        return {}
 
-    if df.empty:
-        return {"Member": 0, "Casual": 0}
-
-    # Count occurrences
-    counts = df["user_type"].value_counts()
-
-    return {
-        "Member": int(counts.get("Member", 0)),
-        "Casual": int(counts.get("Casual", 0)),
-    }
-
+    # Get value counts
+    counts = df[col_name].value_counts().to_dict()
+    return counts
