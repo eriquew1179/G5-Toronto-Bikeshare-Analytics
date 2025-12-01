@@ -29,6 +29,7 @@ def get_top_stations(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     
     top = top.rename(columns={"start_station_name": "station_name"})
     return top
+    return top
 
 def get_top_routes(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     """
