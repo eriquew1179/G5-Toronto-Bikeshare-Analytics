@@ -215,19 +215,29 @@ with tab_predict:
         peak_row = forecast_df.loc[forecast_df['predicted_demand'].idxmax()]
         total_predicted_daily = forecast_df['predicted_demand'].sum()
         
-        m1, m2, m3 = st.columns(3)
+        m1, m2, m3, m4 = st.columns(4)
         m1.metric("Predicted Peak Hour", f"{int(peak_row['hour'])}:00")
         m2.metric("Max Expected Trips", f"{peak_row['predicted_demand']:.1f}")
         m3.metric("Total Daily Forecast", f"{total_predicted_daily:.0f} Trips")
+        m4.metric("Volatility (Risk)", f"±{peak_row['std_dev']:.1f}")
         
         st.markdown("---")
 
         # 3. Interactive Visualization
         st.subheader("Expected Trips per Hour (0-23)")
+        st.caption("The average expected demand for any given day.")
         st.line_chart(forecast_df.set_index("hour")["predicted_demand"])
 
+        # 3. New Refactored Chart (Weekday vs. Weekend)
+        st.subheader("2. Demand Patterns: Weekday vs. Weekend")
+        st.caption("Comparison of usage patterns to identify weekend leisure spikes vs. weekday commute.")
+        
+        # Reshape for Streamlit Chart (It likes 'long' format for colors)
+        chart_data = forecast_df[['hour', 'weekday_demand', 'weekend_demand']].set_index('hour')
+        st.line_chart(chart_data)
         # 4. Detailed Data View
         with st.expander("🔎 View Detailed Forecast Data Source"):
             st.dataframe(forecast_df.style.format({"predicted_demand": "{:.1f}"}), use_container_width=True)
+            st.caption("Data source: src/prediction.py (US-13)")
     else:
         st.warning("Not enough data to generate predictions.")
