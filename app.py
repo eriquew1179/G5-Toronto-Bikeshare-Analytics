@@ -47,8 +47,6 @@ except FileNotFoundError:
     st.stop()
 
 # --- 2. Sidebar Filters (US-12) ---
-
-
 # --- LOGO SECTION ---
 # We place this at the very top of the sidebar
 logo_path = os.path.join("assets", "logo.jpg")
@@ -85,11 +83,11 @@ start_datetime = pd.to_datetime(f"{start_date} {start_time}")
 end_datetime = pd.to_datetime(f"{end_date} {end_time}")
 
 # --- Filter Logic ---
+# This filtered_df is passed to ALL functions below
 mask = (df['Start Time'] >= start_datetime) & (df['Start Time'] <= end_datetime)
 filtered_df = df.loc[mask]
 
 # --- 3. Main Dashboard Area ---
-
 # Header with Logo and Title
 st.title("🚴 Toronto Bike Share: Daily Operations")
 st.subheader("Group 5 - Fall 2025 Agile Software Developmen")
@@ -138,7 +136,10 @@ with tab_overview:
     with c2:
         st.subheader("Daily Trends (US-09)")
         daily_df = get_daily_trend(filtered_df)
-        st.line_chart(daily_df.set_index("date")["trip_count"])
+        if not daily_df.empty:
+            st.line_chart(daily_df.set_index("date")["trip_count"])
+        else:
+            st.info("No data for trend analysis.")
 
 # ==========================================
 # TAB 2: Stations & Routes (US-05, US-06, US-07)
@@ -162,7 +163,10 @@ with tab_stations:
     flow_df = get_station_flow_balance(filtered_df)
     
     # Visualizing Flow: Positive = Blue (In), Negative = Red (Out)
-    st.bar_chart(flow_df.head(20).set_index("Station")["Net Flow"])
+    if not flow_df.empty:
+        st.bar_chart(flow_df.head(20).set_index("Station")["Net Flow"])
+    else:
+        st.info("Not enough data for flow analysis.")
 
 # ==========================================
 # TAB 3: Fleet & Users (US-03, US-04)
@@ -176,8 +180,8 @@ with tab_fleet:
         # Convert dictionary to DataFrame for Chart
         if user_breakdown:
             chart_data = pd.DataFrame.from_dict(user_breakdown, orient='index', columns=['Count'])
-            st.dataframe(chart_data)
-            # Pie charts are not native in basic Streamlit, bar chart is safer
+            st.dataframe(chart_data, use_container_width=True)
+            # Bar chart for distribution
             st.bar_chart(chart_data)
         else:
             st.info("No User Type data available.")
@@ -193,30 +197,37 @@ with tab_fleet:
 # ==========================================
 with tab_predict:
     st.header("🔮 Hourly Demand Forecast")
+    
+    # Methodology explanation (US-14 requirement)
     st.markdown("""
     **Methodology:** This forecast calculates the average number of trips for each hour of the day (0-23) 
-    based on the **entire historical dataset** loaded.
+    based on the **entire historical dataset** loaded. It helps Planners understand the "Expected Demand" curve 
+    for a typical day to schedule staff and resources.
     """)
     
     if not df.empty:
+        # 1. Run Prediction Logic (US-13)
+        # Note: We use the full 'df' here, not 'filtered_df', because predictions 
+        # should be based on all available history to be statistically valid.
         forecast_df = predict_hourly_demand(df)
         
-        # 2. Visualization
-        st.subheader("Expected Trips per Hour (0-23)")
-        
-        # Set 'hour' as index so the line chart uses it as the X-axis
-        st.line_chart(forecast_df.set_index("hour")["predicted_demand"])
-        
-        # 3. Insight Metrics
-        # Find the hour with the maximum predicted demand
+        # 2. Key Prediction Metrics
         peak_row = forecast_df.loc[forecast_df['predicted_demand'].idxmax()]
+        total_predicted_daily = forecast_df['predicted_demand'].sum()
         
-        m1, m2 = st.columns(2)
+        m1, m2, m3 = st.columns(3)
         m1.metric("Predicted Peak Hour", f"{int(peak_row['hour'])}:00")
         m2.metric("Max Expected Trips", f"{peak_row['predicted_demand']:.1f}")
+        m3.metric("Total Daily Forecast", f"{total_predicted_daily:.0f} Trips")
         
-        # 4. Data Table
-        with st.expander("View Prediction Data Source"):
-            st.dataframe(forecast_df)
+        st.markdown("---")
+
+        # 3. Interactive Visualization
+        st.subheader("Expected Trips per Hour (0-23)")
+        st.line_chart(forecast_df.set_index("hour")["predicted_demand"])
+
+        # 4. Detailed Data View
+        with st.expander("🔎 View Detailed Forecast Data Source"):
+            st.dataframe(forecast_df.style.format({"predicted_demand": "{:.1f}"}), use_container_width=True)
     else:
         st.warning("Not enough data to generate predictions.")
