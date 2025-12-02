@@ -1,92 +1,242 @@
-import pandas as pd
+# src/metrics.py
 
-def get_total_trips(df: pd.DataFrame) -> int:
+import pandas as pd
+from typing import Optional, Dict
+
+# 24 hours in seconds – used for outlier detection
+MAX_DURATION_SECONDS = 24 * 60 * 60
+
+
+def get_total_trips(
+    df: pd.DataFrame,
+    start: Optional[pd.Timestamp] = None,
+    end: Optional[pd.Timestamp] = None,
+) -> int:
     """
     US-01: Total Volume KPI
-    Returns total number of trips (rows) in the dataframe.
+
+    Returns the total number of trips (row count). Optionally accepts a
+    date/time filter using the 'Start Time' column.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame where each row represents a trip.
+    start : pd.Timestamp or datetime-like, optional
+        Lower bound (inclusive) for Start Time filter.
+    end : pd.Timestamp or datetime-like, optional
+        Upper bound (inclusive) for Start Time filter.
+
+    Returns
+    -------
+    int
+        Number of trips after applying the optional date filter.
+        Returns 0 if df is None or empty.
     """
-    if df is None:
+    if df is None or df.empty:
         return 0
-    return len(df)
+
+    # If no filter requested, just return the row count
+    if start is None and end is None:
+        return int(len(df))
+
+    # Only apply filter if we actually have a "Start Time" column
+    if "Start Time" in df.columns:
+        mask = pd.Series(True, index=df.index)
+
+        if start is not None:
+            mask &= df["Start Time"] >= pd.to_datetime(start)
+
+        if end is not None:
+            mask &= df["Start Time"] <= pd.to_datetime(end)
+
+        df = df.loc[mask]
+
+    return int(len(df))
+
 
 def get_avg_duration(df: pd.DataFrame) -> float:
     """
     US-02: Average Trip Duration
-    Calculates the average of 'trip_duration_seconds' and returns it in minutes.
+
+    Calculates the average trip duration in minutes, handling outliers and
+    using vectorized operations for speed.
+
+    Behaviour
+    ---------
+    - Uses 'trip_duration_seconds' as the primary column.
+    - Falls back to 'Trip Duration' or 'amount' if needed.
+    - Excludes outliers > 24 hours (86,400 seconds).
+    - Returns 0.0 if the DataFrame is None/empty or no valid column exists.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+
+    Returns
+    -------
+    float
+        Average duration in minutes (float).
     """
     if df is None or df.empty:
         return 0.0
-    
-    # Try standard name first, then fallbacks
-    col_name = 'trip_duration_seconds'
-    if col_name not in df.columns:
-        # Fallback to 'amount' or original name if mapping failed
-        for fallback in ['Trip Duration', 'amount']:
-            if fallback in df.columns:
-                col_name = fallback
-                break
-    
-    if col_name not in df.columns:
+
+    # Try the standard column first, then a couple of reasonable fallbacks
+    duration_cols = ["trip_duration_seconds", "Trip Duration", "amount"]
+    col_name = next((c for c in duration_cols if c in df.columns), None)
+
+    if col_name is None:
         return 0.0
 
-    # Calculate mean (handling potential string issues)
-    avg_val = pd.to_numeric(df[col_name], errors='coerce').mean()
-    
-    # Return in minutes (assuming data is in seconds)
-    return avg_val / 60 if avg_val else 0.0
+    # Vectorized numeric conversion
+    duration_sec = pd.to_numeric(df[col_name], errors="coerce")
 
-def get_bike_usage(df: pd.DataFrame) -> pd.DataFrame:
+    # Remove negative values and > 24-hour outliers
+    duration_sec = duration_sec[(duration_sec >= 0) & (duration_sec <= MAX_DURATION_SECONDS)]
+
+    if duration_sec.empty:
+        return 0.0
+
+    avg_seconds = duration_sec.mean()
+    return float(avg_seconds) / 60.0  # convert to minutes
+
+
+def get_bike_usage(
+    df: pd.DataFrame,
+    top_n: int = 10,
+    extreme_threshold: float = 0.95,
+) -> pd.DataFrame:
     """
     US-03: Bike Usage
-    Groups by bike_id and sums the duration.
+
+    Groups trips by bike ID and sums total duration per bike, returning the
+    bikes with the highest usage.
+
+    Sprint 2 Enhancements
+    ---------------------
+    - Flags "extreme usage" bikes using a quantile threshold.
+    - Returns the Top N most-used bikes (default: 10).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input trip data.
+    top_n : int, optional
+        Number of bikes to return, ordered by total usage (desc).
+    extreme_threshold : float, optional
+        Quantile (0–1) used to flag extreme-usage bikes.
+        Example: 0.95 = bikes in the top 5% by usage.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns:
+        - 'bike_id': identifier of the bike
+        - 'total_duration_seconds': summed duration per bike
+        - 'is_extreme': True if bike is above the usage threshold
+
+        Returns an empty DataFrame with these columns if df is None/empty
+        or required columns are missing.
     """
     if df is None or df.empty:
-        return pd.DataFrame(columns=["bike_id", "total_usage"])
+        return pd.DataFrame(
+            columns=["bike_id", "total_duration_seconds", "is_extreme"]
+        )
 
-    # 1. Identify ID Column (Smart Search)
-    id_cols = ['bike_id', 'Bike Id', 'Bike ID', 'customer_id']
-    id_col = next((c for c in id_cols if c in df.columns), None)
+    # Try to find a bike-id column
+    id_candidates = ["bike_id", "Bike Id", "Bike ID", "customer_id"]
+    id_col = next((c for c in id_candidates if c in df.columns), None)
 
-    # 2. Identify Value Column (Smart Search)
-    val_cols = ['trip_duration_seconds', 'Trip Duration', 'amount']
-    val_col = next((c for c in val_cols if c in df.columns), None)
+    # Try to find a duration/amount column
+    dur_candidates = ["trip_duration_seconds", "Trip Duration", "amount"]
+    dur_col = next((c for c in dur_candidates if c in df.columns), None)
 
-    if not id_col or not val_col:
-        print("ERROR: Could not find required columns for Bike Usage.")
-        return pd.DataFrame(columns=["bike_id", "total_usage"])
+    if id_col is None or dur_col is None:
+        return pd.DataFrame(
+            columns=["bike_id", "total_duration_seconds", "is_extreme"]
+        )
 
-    # 3. Group and Sum
-    # Ensure value column is numeric before summing
+    # Work on a copy to avoid mutating original df
     df = df.copy()
-    df[val_col] = pd.to_numeric(df[val_col], errors='coerce')
-    
-    usage = (
-        df.groupby(id_col)[val_col]
+    df[dur_col] = pd.to_numeric(df[dur_col], errors="coerce")
+
+    # Group & sum
+    grouped = (
+        df.groupby(id_col)[dur_col]
         .sum()
         .reset_index()
-        .sort_values(val_col, ascending=False)
+        .rename(columns={id_col: "bike_id", dur_col: "total_duration_seconds"})
     )
-    
-    # Standardize output names for the UI
-    usage.columns = ["bike_id", "total_usage"]
-    
-    return usage
 
-def get_user_type_breakdown(df: pd.DataFrame) -> dict:
+    if grouped.empty:
+        return pd.DataFrame(
+            columns=["bike_id", "total_duration_seconds", "is_extreme"]
+        )
+
+    # Sort by usage
+    grouped = grouped.sort_values("total_duration_seconds", ascending=False)
+
+    # Compute extreme-usage flag using quantile
+    cutoff = grouped["total_duration_seconds"].quantile(extreme_threshold)
+    grouped["is_extreme"] = grouped["total_duration_seconds"] >= cutoff
+
+    # Return Top N bikes
+    return grouped.head(top_n).reset_index(drop=True)
+
+
+def get_user_type_breakdown(
+    df: pd.DataFrame,
+    return_percentages: bool = False,
+) -> Dict[str, float]:
     """
     US-04: User Type Split
-    Returns counts of each user type.
+
+    Groups by user_type and returns either raw counts or percentage
+    breakdown, ready for plotting.
+
+    Sprint 1 Behaviour
+    ------------------
+    - When `return_percentages=False` (default), returns raw counts:
+      {"Member": 1234, "Casual": 567, ...}
+
+    Sprint 2 Enhancements
+    ---------------------
+    - When `return_percentages=True`, returns a 0–100 percentage breakdown:
+      {"Member": 68.4, "Casual": 31.6}
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input data containing a user-type column.
+    return_percentages : bool, optional
+        False -> return counts (int).
+        True  -> return percentages (float).
+
+    Returns
+    -------
+    dict
+        Mapping from user-type label to count or percentage.
+        Returns {} if df is None/empty or no user-type column is found.
     """
     if df is None or df.empty:
         return {}
 
-    # Identify User Column
-    user_cols = ['user_type', 'User Type', 'type']
-    col_name = next((c for c in user_cols if c in df.columns), None)
-    
-    if not col_name:
+    # Find user type column
+    user_candidates = ["user_type", "User Type", "type"]
+    col_name = next((c for c in user_candidates if c in df.columns), None)
+
+    if col_name is None:
         return {}
 
-    # Get value counts
-    counts = df[col_name].value_counts().to_dict()
-    return counts
+    counts = df[col_name].value_counts(dropna=True)
+
+    if not return_percentages:
+        # Sprint 1-style: raw counts
+        return counts.to_dict()
+
+    total = counts.sum()
+    if total == 0:
+        return {}
+
+    percentages = (counts / total * 100).round(1)  # 1 decimal place
+    return percentages.to_dict()
