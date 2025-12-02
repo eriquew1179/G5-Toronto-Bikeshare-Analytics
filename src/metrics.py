@@ -1,12 +1,31 @@
 # src/metrics.py
 
+from __future__ import annotations
+
+from typing import Optional, Dict, List
+
 import pandas as pd
-from typing import Optional, Dict
 
 # 24 hours in seconds – used for outlier detection
 MAX_DURATION_SECONDS = 24 * 60 * 60
 
 
+# -------------------------------------------------------------------
+# Internal helper utilities (not part of the public API)
+# -------------------------------------------------------------------
+def _first_existing_column(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
+    """Return the first column name from `candidates` that exists in `df`."""
+    return next((c for c in candidates if c in df.columns), None)
+
+
+def _is_empty(df: Optional[pd.DataFrame]) -> bool:
+    """Small helper so we write the None/empty check only once."""
+    return df is None or df.empty
+
+
+# -------------------------------------------------------------------
+# US-01 – Total Volume KPI
+# -------------------------------------------------------------------
 def get_total_trips(
     df: pd.DataFrame,
     start: Optional[pd.Timestamp] = None,
@@ -33,7 +52,7 @@ def get_total_trips(
         Number of trips after applying the optional date filter.
         Returns 0 if df is None or empty.
     """
-    if df is None or df.empty:
+    if _is_empty(df):
         return 0
 
     # If no filter requested, just return the row count
@@ -55,6 +74,9 @@ def get_total_trips(
     return int(len(df))
 
 
+# -------------------------------------------------------------------
+# US-02 – Average Trip Duration
+# -------------------------------------------------------------------
 def get_avg_duration(df: pd.DataFrame) -> float:
     """
     US-02: Average Trip Duration
@@ -68,23 +90,12 @@ def get_avg_duration(df: pd.DataFrame) -> float:
     - Falls back to 'Trip Duration' or 'amount' if needed.
     - Excludes outliers > 24 hours (86,400 seconds).
     - Returns 0.0 if the DataFrame is None/empty or no valid column exists.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-
-    Returns
-    -------
-    float
-        Average duration in minutes (float).
     """
-    if df is None or df.empty:
+    if _is_empty(df):
         return 0.0
 
-    # Try the standard column first, then a couple of reasonable fallbacks
     duration_cols = ["trip_duration_seconds", "Trip Duration", "amount"]
-    col_name = next((c for c in duration_cols if c in df.columns), None)
-
+    col_name = _first_existing_column(df, duration_cols)
     if col_name is None:
         return 0.0
 
@@ -92,7 +103,9 @@ def get_avg_duration(df: pd.DataFrame) -> float:
     duration_sec = pd.to_numeric(df[col_name], errors="coerce")
 
     # Remove negative values and > 24-hour outliers
-    duration_sec = duration_sec[(duration_sec >= 0) & (duration_sec <= MAX_DURATION_SECONDS)]
+    duration_sec = duration_sec[
+        (duration_sec >= 0) & (duration_sec <= MAX_DURATION_SECONDS)
+    ]
 
     if duration_sec.empty:
         return 0.0
@@ -101,6 +114,9 @@ def get_avg_duration(df: pd.DataFrame) -> float:
     return float(avg_seconds) / 60.0  # convert to minutes
 
 
+# -------------------------------------------------------------------
+# US-03 – Bike Usage
+# -------------------------------------------------------------------
 def get_bike_usage(
     df: pd.DataFrame,
     top_n: int = 10,
@@ -138,29 +154,22 @@ def get_bike_usage(
         Returns an empty DataFrame with these columns if df is None/empty
         or required columns are missing.
     """
-    if df is None or df.empty:
-        return pd.DataFrame(
-            columns=["bike_id", "total_duration_seconds", "is_extreme"]
-        )
+    empty_result = pd.DataFrame(
+        columns=["bike_id", "total_duration_seconds", "is_extreme"]
+    )
 
-    # Try to find a bike-id column
-    id_candidates = ["bike_id", "Bike Id", "Bike ID", "customer_id"]
-    id_col = next((c for c in id_candidates if c in df.columns), None)
+    if _is_empty(df):
+        return empty_result
 
-    # Try to find a duration/amount column
-    dur_candidates = ["trip_duration_seconds", "Trip Duration", "amount"]
-    dur_col = next((c for c in dur_candidates if c in df.columns), None)
+    id_col = _first_existing_column(df, ["bike_id", "Bike Id", "Bike ID", "customer_id"])
+    dur_col = _first_existing_column(df, ["trip_duration_seconds", "Trip Duration", "amount"])
 
     if id_col is None or dur_col is None:
-        return pd.DataFrame(
-            columns=["bike_id", "total_duration_seconds", "is_extreme"]
-        )
+        return empty_result
 
-    # Work on a copy to avoid mutating original df
     df = df.copy()
     df[dur_col] = pd.to_numeric(df[dur_col], errors="coerce")
 
-    # Group & sum
     grouped = (
         df.groupby(id_col)[dur_col]
         .sum()
@@ -169,9 +178,7 @@ def get_bike_usage(
     )
 
     if grouped.empty:
-        return pd.DataFrame(
-            columns=["bike_id", "total_duration_seconds", "is_extreme"]
-        )
+        return empty_result
 
     # Sort by usage
     grouped = grouped.sort_values("total_duration_seconds", ascending=False)
@@ -184,6 +191,9 @@ def get_bike_usage(
     return grouped.head(top_n).reset_index(drop=True)
 
 
+# -------------------------------------------------------------------
+# US-04 – User Type Split
+# -------------------------------------------------------------------
 def get_user_type_breakdown(
     df: pd.DataFrame,
     return_percentages: bool = False,
@@ -218,13 +228,10 @@ def get_user_type_breakdown(
         Mapping from user-type label to count or percentage.
         Returns {} if df is None/empty or no user-type column is found.
     """
-    if df is None or df.empty:
+    if _is_empty(df):
         return {}
 
-    # Find user type column
-    user_candidates = ["user_type", "User Type", "type"]
-    col_name = next((c for c in user_candidates if c in df.columns), None)
-
+    col_name = _first_existing_column(df, ["user_type", "User Type", "type"])
     if col_name is None:
         return {}
 
