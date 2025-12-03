@@ -1,51 +1,61 @@
 import pytest
 import pandas as pd
+import numpy as np
 from src.prediction import predict_hourly_demand
 
 @pytest.fixture
-def sample_week_data():
+def sample_mixed_data():
     """
-    Creates a fake dataset spanning 2 days (for simplicity) to test averaging.
-    Day 1: 8:00 AM (2 trips), 9:00 AM (1 trip)
-    Day 2: 8:00 AM (4 trips), 9:00 AM (3 trips)
-    
-    Expected Prediction:
-    8:00 AM -> (2 + 4) / 2 = 3.0 avg
-    9:00 AM -> (1 + 3) / 2 = 2.0 avg
+    Creates a fake dataset spanning a Weekday and a Weekend to test segmentation.
+    Aug 2, 2024 (Friday) - Weekday
+    Aug 3, 2024 (Saturday) - Weekend
     """
     data = {
         "Start Time": [
-            # Day 1
-            "2024-08-01 08:00:00", "2024-08-01 08:30:00", # 2 trips at 8am
-            "2024-08-01 09:15:00",                        # 1 trip at 9am
+            # Friday (Weekday) - 8:00 AM (High Commute) - 3 trips
+            "2024-08-02 08:00:00", "2024-08-02 08:15:00", "2024-08-02 08:30:00",
             
-            # Day 2
-            "2024-08-02 08:10:00", "2024-08-02 08:15:00", "2024-08-02 08:45:00", "2024-08-02 08:50:00", # 4 trips at 8am
-            "2024-08-02 09:05:00", "2024-08-02 09:30:00", "2024-08-02 09:55:00"                         # 3 trips at 9am
+            # Saturday (Weekend) - 8:00 AM (Low Commute) - 1 trip
+            "2024-08-03 08:00:00"
         ]
     }
     df = pd.DataFrame(data)
     df["Start Time"] = pd.to_datetime(df["Start Time"])
     return df
 
-def test_predict_hourly_structure(sample_week_data):
-    """Test that the output has the correct columns and shape."""
-    result = predict_hourly_demand(sample_week_data)
+def test_prediction_schema(sample_mixed_data):
+    """Test that the output contains the new advanced columns."""
+    result = predict_hourly_demand(sample_mixed_data)
     
-    assert "hour" in result.columns
-    assert "predicted_demand" in result.columns
-    # We expect rows for hours 8 and 9 at least. 
-    # Ideally, a robust function returns 0 for missing hours, but let's start simple.
-    assert len(result) >= 2 
+    expected_cols = ['hour', 'predicted_demand', 'std_dev', 'weekday_demand', 'weekend_demand']
+    for col in expected_cols:
+        assert col in result.columns
 
-def test_predict_hourly_calculation(sample_week_data):
-    """Test that the math (Average per hour) is correct."""
-    result = predict_hourly_demand(sample_week_data)
+def test_weekday_vs_weekend_logic(sample_mixed_data):
+    """
+    Test logic:
+    - Weekday Avg at 8am: 3 trips (from Friday)
+    - Weekend Avg at 8am: 1 trip (from Saturday)
+    - Overall Avg at 8am: (3+1)/2 = 2.0 trips
+    """
+    result = predict_hourly_demand(sample_mixed_data)
     
-    # Filter for specific hours
-    pred_8am = result.loc[result['hour'] == 8, 'predicted_demand'].values[0]
-    pred_9am = result.loc[result['hour'] == 9, 'predicted_demand'].values[0]
+    # Check Hour 8
+    row_8am = result[result['hour'] == 8].iloc[0]
     
-    # Assert expected averages
-    assert pred_8am == 3.0  # (2 + 4) / 2
-    assert pred_9am == 2.0  # (1 + 3) / 2
+    assert row_8am['weekday_demand'] == 3.0
+    assert row_8am['weekend_demand'] == 1.0
+    assert row_8am['predicted_demand'] == 2.0
+
+def test_std_deviation(sample_mixed_data):
+    """
+    Test standard deviation calculation.
+    Values at 8am: 3, 1. Mean: 2.
+    Std Dev (Population): 1.0  (or Sample Std Dev: 1.414)
+    """
+    result = predict_hourly_demand(sample_mixed_data)
+    row_8am = result[result['hour'] == 8].iloc[0]
+    
+    # Just check it's not NaN and is positive
+    assert not pd.isna(row_8am['std_dev'])
+    assert row_8am['std_dev'] > 0

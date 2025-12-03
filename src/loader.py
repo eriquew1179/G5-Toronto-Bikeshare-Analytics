@@ -32,7 +32,7 @@ class DataLoader:
         df = self.clean_data(df)
         
         # 5. Optimize Memory (Sprint 2 Refactor)
-        df = self._optimize_types(df)
+        df = self._optimize_memory(df)
         
         return df
 
@@ -87,7 +87,7 @@ class DataLoader:
 
         return df
     
-    def _optimize_types(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _optimize_memory(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Sprint 2 Refactor: Converts low-cardinality string columns to categories.
         This drastically reduces memory usage.
@@ -96,10 +96,12 @@ class DataLoader:
         # 'user_type' (Member/Casual)
         # 'model' (ICONIC/EFIT)
         # 'start_station_name' (Repeats often)
-        category_cols = ['user_type', 'model', 'start_station_name', 'end_station_name']
+        cat_cols = ['user_type', 'model', 'start_station_name', 'end_station_name']
         
-        for col in category_cols:
+        for col in cat_cols:
             if col in df.columns:
-                df[col] = df[col].astype('category')
-                
+                # Only convert if the column is object type
+                if df[col].dtype == 'object':
+                    df[col] = df[col].astype('category')
+                    
         return df

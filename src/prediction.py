@@ -41,8 +41,8 @@ def predict_hourly_demand(df: pd.DataFrame) -> pd.DataFrame:
     # --- A. Overall Average & Risk (Std Dev) ---
     # We group by hour across ALL days to get the general expectation
     overall_stats = hourly_counts.groupby('hour')['trips'].agg(['mean', 'std']).reset_index()
-    overall_stats.rename(columns={'mean': 'predicted_demand', 'std': 'std_dev'}, inplace=True)
-    
+    overall_stats.rename(columns={'mean': 'predicted_demand', 'std': 'std_dev'}, inplace=True)# Merge Everything Together    
+
     # --- B. Weekday Average ---
     # Filter for weekdays only, then calculate mean per hour
     weekday_data = hourly_counts[hourly_counts['is_weekend'] == False]
@@ -64,7 +64,7 @@ def predict_hourly_demand(df: pd.DataFrame) -> pd.DataFrame:
     
     # 6. Formatting (Round for readability)
     cols_to_round = ['predicted_demand', 'std_dev', 'weekday_demand', 'weekend_demand']
-    final_df[cols_to_round] = final_df[cols_to_round].round(1)
+    final_df[cols_to_round] = final_df[cols_to_round].round(0)
     
     return final_df
 
