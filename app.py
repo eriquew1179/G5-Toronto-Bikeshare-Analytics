@@ -84,7 +84,54 @@ end_datetime = pd.to_datetime(f"{end_date} {end_time}")
 
 # --- Filter Logic ---
 # This filtered_df is passed to ALL functions below
+# B. Dynamic Station Filter (Sprint 2 Feature)
+# We get the list of unique stations to populate the dropdown
+if 'start_station_name' in df.columns:
+    # 1. Drop NaNs
+    unique_stations = df['start_station_name'].dropna().unique()
+    # 2. Convert all to string to ensure consistent sorting
+    unique_stations = [str(x) for x in unique_stations]
+    all_stations = sorted(unique_stations)
+
+    # 2. Add a Text Input for "Quick Search"
+    st.sidebar.markdown("---")
+    st.sidebar.write("📍 **Station Filter**")
+    
+    # This text input allows users to type part of a name (e.g., "Union")
+    search_term = st.sidebar.text_input("Search Station Name", "")
+
+    # 3. Filter the options based on the search term
+    if search_term:
+        # If user types something, filter the list of options
+        filtered_options = [s for s in all_stations if search_term.lower() in s.lower()]
+    else:
+        # If empty, show all options
+        filtered_options = all_stations
+
+    # 4. Show the Multiselect with the FILTERED options
+    # This makes the dropdown much shorter and easier to use
+    selected_stations = st.sidebar.multiselect(
+        f"Select Stations ({len(filtered_options)} found)", 
+        filtered_options,
+        default=[] # Default to empty (all stations)
+    )
+    # 3. Sort
+    #station_options = sorted(unique_stations)
+    
+    #station_options = sorted(df['start_station_name'].unique().tolist())
+    # Multiselect allows picking one or many stations
+    #selected_stations = st.sidebar.multiselect("Filter by Start Station", station_options)
+else:
+    selected_stations = []
+
+# --- Global Filter Logic ---
+# 1. Time Mask
 mask = (df['Start Time'] >= start_datetime) & (df['Start Time'] <= end_datetime)
+
+# 2. Station Mask (Only apply if user selected something)
+if selected_stations:
+    mask = mask & (df['start_station_name'].astype(str).isin(selected_stations))
+
 filtered_df = df.loc[mask]
 
 # --- 3. Main Dashboard Area ---
@@ -129,12 +176,12 @@ with tab_overview:
     c1, c2 = st.columns(2)
     
     with c1:
-        st.subheader("Peak Hours (US-08)")
+        st.subheader("Peak Hours")
         peak_df = get_peak_hours(filtered_df)
         st.bar_chart(peak_df.set_index("hour")["trip_count"], color="#FF4B4B")
     
     with c2:
-        st.subheader("Daily Trends (US-09)")
+        st.subheader("Daily Trends)")
         daily_df = get_daily_trend(filtered_df)
         if not daily_df.empty:
             st.line_chart(daily_df.set_index("date")["trip_count"])
@@ -148,17 +195,17 @@ with tab_stations:
     c1, c2 = st.columns(2)
     
     with c1:
-        st.subheader("Top 10 Start Stations (US-05)")
+        st.subheader("Top 10 Start Stations")
         top_stations = get_top_stations(filtered_df, n=10)
         st.dataframe(top_stations, hide_index=True, use_container_width=True)
         
     with c2:
-        st.subheader("Top 5 Routes (US-06)")
+        st.subheader("Top 5 Routes")
         top_routes = get_top_routes(filtered_df, n=5)
         st.dataframe(top_routes, hide_index=True, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("Station Flow Balance (US-07)")
+    st.subheader("Station Flow Balance")
     st.caption("Stations filling up (Surplus) vs. emptying out (Deficit). Useful for Rebalancing.")
     flow_df = get_station_flow_balance(filtered_df)
     
@@ -176,6 +223,7 @@ with tab_fleet:
     
     with c1:
         st.subheader("User Type Split (US-04)")
+        st.caption("Sum of User Type.")
         user_breakdown = get_user_type_breakdown(filtered_df)
         # Convert dictionary to DataFrame for Chart
         if user_breakdown:
@@ -202,7 +250,8 @@ with tab_predict:
     st.markdown("""
     **Methodology:** This forecast calculates the average number of trips for each hour of the day (0-23) 
     based on the **entire historical dataset** loaded. It helps Planners understand the "Expected Demand" curve 
-    for a typical day to schedule staff and resources.
+    for a typical day to schedule staff and resources, also includes **Risk Analysis** (Volatility) and separates 
+    **Weekday vs. Weekend** patterns to support precise operational planning.
     """)
     
     if not df.empty:
@@ -224,7 +273,7 @@ with tab_predict:
         st.markdown("---")
 
         # 3. Interactive Visualization
-        st.subheader("Expected Trips per Hour (0-23)")
+        st.subheader("1. Expected Trips per Hour (0-23)")
         st.caption("The average expected demand for any given day.")
         st.line_chart(forecast_df.set_index("hour")["predicted_demand"])
 
@@ -237,7 +286,7 @@ with tab_predict:
         st.line_chart(chart_data)
         # 4. Detailed Data View
         with st.expander("🔎 View Detailed Forecast Data Source"):
-            st.dataframe(forecast_df.style.format({"predicted_demand": "{:.1f}"}), use_container_width=True)
+            st.dataframe(forecast_df.style.format({"predicted_demand": "{:.1f}", "std_dev": "{:.1f}"}), use_container_width=True)
             st.caption("Data source: src/prediction.py (US-13)")
     else:
         st.warning("Not enough data to generate predictions.")

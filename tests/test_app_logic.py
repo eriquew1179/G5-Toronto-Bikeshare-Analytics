@@ -2,40 +2,38 @@ import pytest
 import pandas as pd
 from datetime import date
 
-# --- Logic Extraction ---
-# This mimics the logic inside app.py for testing purposes
-def filter_data_by_date(df: pd.DataFrame, start_date: date, end_date: date) -> pd.DataFrame:
+# --- Logic Extraction (Updated for Sprint 2) ---
+def filter_data(df: pd.DataFrame, start_date: date, end_date: date, selected_stations: list = None) -> pd.DataFrame:
     """
-    Filters the dataframe based on a date range (inclusive).
-    Handles the comparison between pandas Timestamp and python date objects.
+    Refactored Logic: Filters by Date AND Station.
     """
-    # Access the .dt.date accessor to compare with python date objects
+    # 1. Date Filter
     mask = (df['Start Time'].dt.date >= start_date) & (df['Start Time'].dt.date <= end_date)
+    
+    # 2. Station Filter (New)
+    if selected_stations:
+        mask = mask & (df['start_station_name'].isin(selected_stations))
+        
     return df.loc[mask]
 
-# --- The Test ---
-def test_date_filtering_logic_august_data():
-    # 1. Create mock data (Mimicking your Aug 1 - Aug 8 dataset)
+# --- Tests ---
+def test_filter_by_station():
+    # 1. Mock Data
     data = {
-        'Trip Id': [101, 102, 103, 104],
-        'Start Time': pd.to_datetime([
-            '2024-08-01 08:00:00',  # Day 1
-            '2024-08-04 12:30:00',  # Day 4 (Target)
-            '2024-08-08 23:59:00',  # Day 8
-            '2024-08-09 00:01:00'   # Day 9 (Out of range)
-        ])
+        'Start Time': pd.to_datetime(['2024-08-01', '2024-08-01', '2024-08-01']),
+        'start_station_name': ['Station A', 'Station B', 'Station A'],
+        'Trip Id': [1, 2, 3]
     }
     df = pd.DataFrame(data)
     
-    # 2. Define filter range (e.g., Filter for the middle of the week)
-    # We use datetime.date because that is what Streamlit returns
-    start = date(2024, 8, 3)
-    end = date(2024, 8, 5)
+    # 2. Define Filters
+    start = date(2024, 8, 1)
+    end = date(2024, 8, 1)
+    stations = ['Station B'] # We only want Station B
     
     # 3. Apply Logic
-    filtered = filter_data_by_date(df, start, end)
+    result = filter_data(df, start, end, stations)
     
     # 4. Assert
-    # Should only keep the Aug 4th entry
-    assert len(filtered) == 1
-    assert filtered.iloc[0]['Trip Id'] == 102
+    assert len(result) == 1
+    assert result.iloc[0]['start_station_name'] == 'Station B'
