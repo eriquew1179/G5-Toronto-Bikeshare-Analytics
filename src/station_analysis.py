@@ -64,47 +64,57 @@ def get_top_routes(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     return top_routes
 
 
-def get_station_flow_balance(df: pd.DataFrame) -> pd.DataFrame:
+def get_station_flow_balance(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     """
-    US-07 Station Flow Balance (Sprint 1)
-    
-    Calculates Net Flow = Arrivals (Ends) - Departures (Starts)
-    Returns DataFrame with columns: ['Station', 'Net Flow']
-    Sorted by absolute magnitude of flow (highest surplus/deficit first).
-    """
-    if df is None or df.empty:
-        return pd.DataFrame(columns=["Station", "Net Flow"])
-        
-    required_cols = ["start_station_name", "end_station_name"]
-    for col in required_cols:
-        if col not in df.columns:
-            return pd.DataFrame(columns=["Station", "Net Flow"])
+    US-07 Refactor (Sprint 2)
+    Calculates the net flow for each station:
+        net_flow = arrivals - departures
 
-    # Count departures (trips leaving the station)
+    Enhancements:
+    - Ignore null or blank station names
+    - Consistent sorting with alphabetical tie-breaker
+    - Improved code clarity and maintainability
+    """
+
+    required_cols = ["start_station_name", "end_station_name"]
+
+    if df is None or df.empty or any(col not in df.columns for col in required_cols):
+        return pd.DataFrame(columns=["station_name", "net_flow"])
+
+    # Filter out invalid entries
+    clean_df = df[
+        df["start_station_name"].notna() &
+        df["end_station_name"].notna() &
+        (df["start_station_name"] != "") &
+        (df["end_station_name"] != "")
+    ]
+
+    if clean_df.empty:
+        return pd.DataFrame(columns=["station_name", "net_flow"])
+
+    # Count departures and arrivals
     departures = (
-        df.groupby("start_station_name")
+        clean_df.groupby("start_station_name")
         .size()
         .reset_index(name="departures")
-        .rename(columns={"start_station_name": "Station"})
+        .rename(columns={"start_station_name": "station_name"})
     )
 
-    # Count arrivals (trips arriving at the station)
     arrivals = (
-        df.groupby("end_station_name")
+        clean_df.groupby("end_station_name")
         .size()
         .reset_index(name="arrivals")
-        .rename(columns={"end_station_name": "Station"})
+        .rename(columns={"end_station_name": "station_name"})
     )
 
-    # Combine departures and arrivals
-    # Outer join ensures we capture stations that might only have starts or only ends
-    flow = pd.merge(arrivals, departures, on="Station", how="outer").fillna(0)
+    # Merge into flow summary
+    flow = pd.merge(arrivals, departures, on="station_name", how="outer").fillna(0)
+    flow["net_flow"] = flow["arrivals"].astype(int) - flow["departures"].astype(int)
 
-    # Calculate Net Flow: Positive = Surplus (More arrivals), Negative = Deficit (More departures)
-    flow["Net Flow"] = flow["arrivals"] - flow["departures"]
+    # Sorting
+    flow = flow.sort_values(
+        by=["net_flow", "station_name"],
+        ascending=[False, True]
+    ).reset_index(drop=True)
 
-    # Sort by absolute impact (biggest movers first)
-    flow["abs_flow"] = flow["Net Flow"].abs()
-    flow = flow.sort_values("abs_flow", ascending=False).drop(columns=["abs_flow"])
-
-    return flow[["Station", "Net Flow"]]
+    return flow[["station_name", "net_flow"]].head(n)
