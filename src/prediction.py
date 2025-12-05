@@ -1,3 +1,5 @@
+# Prediction module for Toronto Bike Share dataset US-13
+# src/prediction.py
 import pandas as pd
 import numpy as np
 

@@ -1,3 +1,7 @@
+
+# app.py - Main Streamlit Application
+# US-11 to US-14
+
 import streamlit as st
 import pandas as pd
 from src.loader import DataLoader
@@ -51,7 +55,7 @@ except FileNotFoundError:
 # We place this at the very top of the sidebar
 logo_path = os.path.join("assets", "logo.jpg")
 if os.path.exists(logo_path):
-    st.sidebar.image(logo_path, use_container_width=True)
+    st.sidebar.image(logo_path, width='stretch')
 else:
     st.sidebar.write("🚲 **Group 5 Analytics**")
 
@@ -86,6 +90,7 @@ end_datetime = pd.to_datetime(f"{end_date} {end_time}")
 # This filtered_df is passed to ALL functions below
 # B. Dynamic Station Filter (Sprint 2 Feature)
 # We get the list of unique stations to populate the dropdown
+selected_stations = []
 if 'start_station_name' in df.columns:
     # 1. Drop NaNs
     unique_stations = df['start_station_name'].dropna().unique()
@@ -121,8 +126,8 @@ if 'start_station_name' in df.columns:
     #station_options = sorted(df['start_station_name'].unique().tolist())
     # Multiselect allows picking one or many stations
     #selected_stations = st.sidebar.multiselect("Filter by Start Station", station_options)
-else:
-    selected_stations = []
+#else:
+#    selected_stations = []
 
 # --- Global Filter Logic ---
 # 1. Time Mask
@@ -176,12 +181,15 @@ with tab_overview:
     c1, c2 = st.columns(2)
     
     with c1:
-        st.subheader("Peak Hours")
+        st.subheader("Peak Hours (US-08)")
         peak_df = get_peak_hours(filtered_df)
-        st.bar_chart(peak_df.set_index("hour")["trip_count"], color="#FF4B4B")
+        if not peak_df.empty:
+            st.bar_chart(peak_df.set_index("hour")["trip_count"], color="#FF4B4B")
+        else:
+            st.info("No peak data available.")
     
     with c2:
-        st.subheader("Daily Trends)")
+        st.subheader("Daily Trends (US-09)")
         daily_df = get_daily_trend(filtered_df)
         if not daily_df.empty:
             st.line_chart(daily_df.set_index("date")["trip_count"])
@@ -195,23 +203,29 @@ with tab_stations:
     c1, c2 = st.columns(2)
     
     with c1:
-        st.subheader("Top 10 Start Stations")
+        st.subheader("Top 10 Start Stations (US-05)")
         top_stations = get_top_stations(filtered_df, n=10)
-        st.dataframe(top_stations, hide_index=True, use_container_width=True)
+        st.dataframe(top_stations, hide_index=True, width='stretch')
         
     with c2:
-        st.subheader("Top 5 Routes")
+        st.subheader("Top 5 Routes (US-06)")
         top_routes = get_top_routes(filtered_df, n=5)
-        st.dataframe(top_routes, hide_index=True, use_container_width=True)
+        st.dataframe(top_routes, hide_index=True, width='stretch')
 
     st.markdown("---")
-    st.subheader("Station Flow Balance")
+    st.subheader("Station Flow Balance (US-07)")
     st.caption("Stations filling up (Surplus) vs. emptying out (Deficit). Useful for Rebalancing.")
     flow_df = get_station_flow_balance(filtered_df)
     
     # Visualizing Flow: Positive = Blue (In), Negative = Red (Out)
     if not flow_df.empty:
-        st.bar_chart(flow_df.head(20).set_index("Station")["Net Flow"])
+        if "station_name" in flow_df.columns and "net_flow" in flow_df.columns:
+            st.bar_chart(flow_df.head(20).set_index("station_name")["net_flow"])
+        elif "Station" in flow_df.columns and "Net Flow" in flow_df.columns:
+             # Fallback for older logic
+            st.bar_chart(flow_df.head(20).set_index("Station")["Net Flow"])
+        else:
+            st.error(f"Column mismatch. Found: {list(flow_df.columns)}")
     else:
         st.info("Not enough data for flow analysis.")
 
@@ -228,7 +242,7 @@ with tab_fleet:
         # Convert dictionary to DataFrame for Chart
         if user_breakdown:
             chart_data = pd.DataFrame.from_dict(user_breakdown, orient='index', columns=['Count'])
-            st.dataframe(chart_data, use_container_width=True)
+            st.dataframe(chart_data, width='stretch')
             # Bar chart for distribution
             st.bar_chart(chart_data)
         else:
@@ -238,7 +252,7 @@ with tab_fleet:
         st.subheader("High Usage Bikes (US-03)")
         st.caption("Top 10 bikes by total trip duration (potential maintenance candidates).")
         bike_usage = get_bike_usage(filtered_df)
-        st.dataframe(bike_usage.head(10), hide_index=True, use_container_width=True)
+        st.dataframe(bike_usage.head(10), hide_index=True, width='stretch')
 
 # ==========================================
 # TAB 4: Future Predictions (US-13 & US-14)
@@ -286,7 +300,7 @@ with tab_predict:
         st.line_chart(chart_data)
         # 4. Detailed Data View
         with st.expander("🔎 View Detailed Forecast Data Source"):
-            st.dataframe(forecast_df.style.format({"predicted_demand": "{:.1f}", "std_dev": "{:.1f}"}), use_container_width=True)
+            st.dataframe(forecast_df.style.format({"predicted_demand": "{:.1f}", "std_dev": "{:.1f}"}), width='stretch')
             st.caption("Data source: src/prediction.py (US-13)")
     else:
         st.warning("Not enough data to generate predictions.")

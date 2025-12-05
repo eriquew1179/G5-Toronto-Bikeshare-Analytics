@@ -37,9 +37,10 @@ pip install -r requirements.txt
 
 Before running, you must manually place the dataset in the project structure, as it is ignored by Git for security/size reasons.
 
-Place your financial_transactions.csv file inside the /data/ folder.
+## Make sure you have the dataset file "financial_transactions.csv" in the correct location:
+Place your "financial_transactions.csv" file inside the /data/ folder.
 
-Run the application:
+## Run the application:
 
 streamlit run app.py
 
