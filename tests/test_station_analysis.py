@@ -59,3 +59,29 @@ def test_station_flow_balance_empty():
     df = pd.DataFrame(columns=["start_station_name", "end_station_name"])
     result = get_station_flow_balance(df)
     assert result.empty
+
+# -------- US-07 REFACTOR TESTS (SPRINT 2) --------
+
+def test_station_flow_balance_ignore_invalid_entries():
+    df = pd.DataFrame({
+        "start_station_name": ["A", None, "B", ""],
+        "end_station_name":   ["B", "A", "", None],
+    })
+    result = get_station_flow_balance(df, 5)
+
+    # Invalid entries removed
+    assert not result["station_name"].isin(["", None]).any()
+
+
+def test_station_flow_balance_tie_breaker_sorting():
+    df = pd.DataFrame({
+        "start_station_name": ["A", "B"],
+        "end_station_name":   ["B", "A"],
+    })
+    # Both have net_flow = 0
+    result = get_station_flow_balance(df, 2)
+
+    assert len(result) == 2
+    # Alphabetical tie-breaker for consistent ordering
+    assert result.loc[0, "station_name"] == "A"
+    assert result.loc[1, "station_name"] == "B"
