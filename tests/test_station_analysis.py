@@ -18,6 +18,33 @@ def test_get_top_stations_empty():
     df = pd.DataFrame(columns=["start_station_name"])
     result = get_top_stations(df)
     assert result.empty
+
+# -------- US-05 REFACTOR TESTS (SPRINT 2) --------
+
+def test_top_stations_ignore_invalid_entries():
+    df = pd.DataFrame({
+        "start_station_name": ["A", None, "A", "", "B"],
+    })
+    result = get_top_stations(df, 2)
+
+    # Should not include blank or null station names
+    assert not result["station_name"].isin(["", None]).any()
+    assert len(result) == 2
+
+
+def test_top_stations_tie_breaker_alphabetical():
+    df = pd.DataFrame({
+        "start_station_name": ["B", "A"],
+    })
+    result = get_top_stations(df, 2)
+
+    # A and B appear once → tie
+    assert len(result) == 2
+
+    # Tie-breaker should sort alphabetically by station name
+    assert result.loc[0, "station_name"] == "A"
+    assert result.loc[1, "station_name"] == "B"
+
 # -------- US-06 TOP ROUTES TESTS --------
 
 import pandas as pd
