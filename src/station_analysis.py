@@ -34,34 +34,50 @@ def get_top_stations(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
 
 def get_top_routes(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     """
-    US-06 Top Routes (Sprint 1)
-    
-    Groups by route:
-        route = "Start → End"
-    Returns Top N routes by frequency.
+    US-06 Refactor (Sprint 2)
+    Returns the top N most frequently used routes.
+
+    Enhancements:
+    - Ignore null or blank station names
+    - Alphabetical tie-breaker for consistent sorting
     """
-    if df is None or df.empty:
-        return pd.DataFrame(columns=["route", "trip_count"])
 
     required_cols = ["start_station_name", "end_station_name"]
-    for col in required_cols:
-        if col not in df.columns:
-            return pd.DataFrame(columns=["route", "trip_count"])
 
-    df = df.copy()
-    # Create the route string
-    df["route"] = df["start_station_name"].astype(str) + " → " + df["end_station_name"].astype(str)
+    if df is None or df.empty or any(col not in df.columns for col in required_cols):
+        return pd.DataFrame(columns=["start_station", "end_station", "trip_count"])
 
-    top_routes = (
-        df.groupby("route")
+    # Drop invalid rows
+    clean_df = df[
+        df["start_station_name"].notna() &
+        df["end_station_name"].notna() &
+        (df["start_station_name"] != "") &
+        (df["end_station_name"] != "")
+    ]
+
+    if clean_df.empty:
+        return pd.DataFrame(columns=["start_station", "end_station", "trip_count"])
+
+    # Count route frequency
+    route_counts = (
+        clean_df.groupby(["start_station_name", "end_station_name"])
         .size()
         .reset_index(name="trip_count")
-        .sort_values(by="trip_count", ascending=False)
-        .head(n)
-        .reset_index(drop=True)
+        .rename(columns={
+            "start_station_name": "start_station",
+            "end_station_name": "end_station"
+        })
     )
 
-    return top_routes
+    # Sort:
+    # 1️⃣ by trip_count descending
+    # 2️⃣ by start_station (alphabetical) for tie-breaking
+    route_counts = route_counts.sort_values(
+        by=["trip_count", "start_station"],
+        ascending=[False, True]
+    ).reset_index(drop=True)
+
+    return route_counts.head(n)
 
 
 def get_station_flow_balance(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
