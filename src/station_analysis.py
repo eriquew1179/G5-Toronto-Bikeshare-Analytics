@@ -3,33 +3,39 @@ import pandas as pd
 
 def get_top_stations(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
     """
-    US-05 Top Stations (Sprint 1)
-    - Groups by 'start_station_name'
-    - Returns Top N stations sorted descending by usage (count of trips)
-    - Drops rows with null station names
+    US-05 Refactor (Sprint 2)
+    Returns the top N stations with highest departure counts.
 
-    Output Columns:
-        ['station_name', 'trip_count']
+    Enhancements:
+    - Ignore null or blank station names
+    - Alphabetical tie-breaker when trip counts are equal
     """
-    if df is None or df.empty:
+
+    if df is None or df.empty or "start_station_name" not in df.columns:
         return pd.DataFrame(columns=["station_name", "trip_count"])
 
-    if "start_station_name" not in df.columns:
-        # Fallback or raise error depending on strictness
+    # Drop invalid/blank entries
+    clean_df = df[df["start_station_name"].notna() & (df["start_station_name"] != "")]
+
+    if clean_df.empty:
         return pd.DataFrame(columns=["station_name", "trip_count"])
 
-    top = (
-        df.dropna(subset=["start_station_name"])
-        .groupby("start_station_name")
+    # Count occurrences
+    station_counts = (
+        clean_df.groupby("start_station_name")
         .size()
         .reset_index(name="trip_count")
-        .sort_values(by="trip_count", ascending=False)
-        .head(n)
-        .reset_index(drop=True)
+        .rename(columns={"start_station_name": "station_name"})
     )
-    
-    top = top.rename(columns={"start_station_name": "station_name"})
-    return top
+
+    # Primary sort: trip_count desc
+    # Secondary sort: station_name alphabetical
+    station_counts = station_counts.sort_values(
+        by=["trip_count", "station_name"],
+        ascending=[False, True]
+    ).reset_index(drop=True)
+
+    return station_counts.head(n)
 
 
 def get_top_routes(df: pd.DataFrame, n: int = 10) -> pd.DataFrame:
