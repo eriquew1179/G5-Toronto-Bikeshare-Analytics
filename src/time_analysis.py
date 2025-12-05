@@ -1,3 +1,5 @@
+# Time Analysis module for Toronto Bike Share dataset US-08 to US-09
+# src/time_analysis.py
 import pandas as pd
 
 def get_peak_hours(df: pd.DataFrame) -> pd.DataFrame:

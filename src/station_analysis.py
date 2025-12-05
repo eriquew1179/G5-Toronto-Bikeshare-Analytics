@@ -1,3 +1,6 @@
+# Station Analysis module for Toronto Bike Share dataset US-05 to US-07
+# src/station_analysis.py
+
 import pandas as pd
 
 def get_top_stations(df: pd.DataFrame, n: int = 10, station_type: str = "start") -> pd.DataFrame:
