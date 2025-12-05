@@ -40,6 +40,34 @@ def test_get_top_routes_empty():
 import pandas as pd
 from src.station_analysis import get_station_flow_balance
 
+# -------- US-06 REFACTOR TESTS (SPRINT 2) --------
+
+def test_top_routes_ignore_invalid_stations():
+    df = pd.DataFrame({
+        "start_station_name": ["A", None, "A", "", "B"],
+        "end_station_name": ["B", "B", None, "C", ""],
+    })
+    result = get_top_routes(df, 2)
+
+    # Should not include blank or null station names
+    assert not result["start_station"].isin(["", None]).any()
+    assert not result["end_station"].isin(["", None]).any()
+    assert len(result) <= 2
+
+
+def test_top_routes_tie_breaker_sort():
+    df = pd.DataFrame({
+        "start_station_name": ["A", "B"],
+        "end_station_name": ["C", "C"],
+    })
+    # Both A→C and B→C appear once → tie
+    result = get_top_routes(df, 2)
+
+    assert len(result) == 2
+    # Alphabetical tie-breaker for consistency
+    assert result.loc[0, "start_station"] == "A"
+    assert result.loc[1, "start_station"] == "B"
+
 # -------- US-07 STATION FLOW BALANCE TESTS --------
 
 def test_station_flow_balance_basic():
