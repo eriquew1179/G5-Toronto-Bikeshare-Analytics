@@ -1,3 +1,14 @@
+"""
+Sprint 2 Refactor (US-08, US-09, US-10)
+Refactored by: [Your Name]
+Date: [Today's Date]
+
+Summary:
+- Improved efficiency using vectorized pandas operations.
+- Added datetime error handling and sorting for charts.
+- Updated docstrings to show Sprint 2 refactor changes.
+- Verified compatibility with Streamlit dashboard and tests.
+"""
 import pandas as pd
 
 def get_peak_hours(df: pd.DataFrame) -> pd.DataFrame:
